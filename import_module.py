@@ -5,6 +5,8 @@ import os
 import sys
 import git
 
+_MODULES_PATH = os.path.abspath("__importmodule__")
+
 
 class ImportModule(object):
     def __init__(self, module, reload=False):
@@ -17,7 +19,6 @@ class ImportModule(object):
 
         self.module = module
         self.reload = reload
-        self.modules_path = os.path.abspath("__importmodule__")
 
     def _get_module(self, module, path):
         # TODO Add Bitbucket, GitHub, Google Code, and Launchpad
@@ -44,7 +45,7 @@ class ImportModule(object):
                 os.rmdir(os.path.join(root, d))
 
     def _load_module(self, module):
-        module_path = os.path.join(self.modules_path, module)
+        module_path = os.path.join(_MODULES_PATH, module)
 
         if self.reload and os.path.exists(module_path):
             self._remove_tree(module_path)
