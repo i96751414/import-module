@@ -23,7 +23,7 @@ class ImportModule(object):
         # TODO Add Bitbucket, GitHub, Google Code, and Launchpad
         if module.startswith("github.com/"):
             git.Repo.clone_from("https://{}".format(module), path)
-            self._chmod(path, 0o777)
+            self._chmod(path, 0o755)
         else:
             raise NotImplementedError("Type of module not supported")
 
