@@ -58,7 +58,7 @@ def check_import_module(module, module_name, checker_handler):
 
     checker_handler(m3)
 
-    assert t1 < t3
+    assert t2 < t1
     assert t2 < t3
 
 
