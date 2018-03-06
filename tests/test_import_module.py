@@ -72,7 +72,8 @@ def test_import_github():
         assert attributes == ["call"]
         assert module.call() == "call"
 
-    check_import_module("github.com/i96751414/py-dummy", "dummy", check_dummy_module)
+    check_import_module(
+        "github.com/i96751414/py-dummy", "dummy", check_dummy_module)
 
 
 if __name__ == "__main__":
