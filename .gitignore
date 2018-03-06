@@ -1,0 +1,12 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pycharm stuff
+.idea
+
+# Pytest stuff
+.pytest_cache
+
+__importmodule__/
