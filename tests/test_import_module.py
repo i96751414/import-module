@@ -84,9 +84,19 @@ def check_import_module(module, module_name, checker_handler):
     # Check behavior of imported module
     checker_handler(m3)
 
+    # Import the module using a different path - the repo should be cloned
+    timer.start()
+    with ImportModule(module, path="different_path"):
+        m4 = importlib.import_module(module_name)
+    t4 = timer.stop()
+
+    # Check behavior of imported module
+    checker_handler(m4)
+
     # Check if times match: when reload=False, the time should be minimal
     assert t2 < t1
     assert t2 < t3
+    assert t2 < t4
 
     # Test ImportModule with array
     with ImportModule([module, module]):
