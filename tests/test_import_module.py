@@ -12,6 +12,10 @@ from import_module import ImportModule, _MODULES_PATH
 
 
 class Timer:
+    """
+    Helper timer class
+    """
+
     def __init__(self):
         self.__start = None
 
@@ -28,6 +32,11 @@ timer = Timer()
 
 
 def clear_modules_path():
+    """
+    Clear import_module related data
+
+    :return: None
+    """
     if os.path.exists(_MODULES_PATH):
         # noinspection PyProtectedMember
         ImportModule._remove_tree(_MODULES_PATH)
@@ -35,31 +44,63 @@ def clear_modules_path():
 
 
 def check_import_module(module, module_name, checker_handler):
+    """
+    Set of checks for testing if a module is being imported
+
+    :param module: module identifier, similar to github.com/user/module_name
+    :param module_name: name of module to be imported
+    :param checker_handler: handler to assure the module was imported
+    :return: None
+    """
+    # Assure there is no cached data
     clear_modules_path()
 
+    # Since it is the first time importing, the repo should be cloned
     timer.start()
     with ImportModule(module):
         m1 = importlib.import_module(module_name)
     t1 = timer.stop()
 
+    # Check behavior of imported module
     checker_handler(m1)
 
+    # Since it is the second time importing and reload=False
+    # the repo should NOT be cloned
     timer.start()
     with ImportModule(module, reload=False):
         m2 = importlib.import_module(module_name)
     t2 = timer.stop()
 
+    # Check behavior of imported module
     checker_handler(m2)
 
+    # Although it is the third time importing, reload is True so
+    # the repo should be cloned
     timer.start()
     with ImportModule(module, reload=True):
         m3 = importlib.import_module(module_name)
     t3 = timer.stop()
 
+    # Check behavior of imported module
     checker_handler(m3)
 
+    # Check if times match: when reload=False, the time should be minimal
     assert t2 < t1
     assert t2 < t3
+
+    # Test ImportModule with array
+    with ImportModule([module, module]):
+        m4 = importlib.import_module(module_name)
+
+    # Check behavior of imported module
+    checker_handler(m4)
+
+    # Test ImportModule with tuple
+    with ImportModule((module, module)):
+        m5 = importlib.import_module(module_name)
+
+    # Check behavior of imported module
+    checker_handler(m5)
 
 
 def test_import_github():
