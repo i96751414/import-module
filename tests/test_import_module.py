@@ -67,7 +67,7 @@ def check_import_module(module, module_name, checker_handler):
     # Since it is the second time importing and reload=False
     # the repo should NOT be cloned
     timer.start()
-    with ImportModule(module, reload=False):
+    with ImportModule(module, reload_module=False):
         m2 = importlib.import_module(module_name)
     t2 = timer.stop()
 
@@ -77,7 +77,7 @@ def check_import_module(module, module_name, checker_handler):
     # Although it is the third time importing, reload is True so
     # the repo should be cloned
     timer.start()
-    with ImportModule(module, reload=True):
+    with ImportModule(module, reload_module=True):
         m3 = importlib.import_module(module_name)
     t3 = timer.stop()
 
