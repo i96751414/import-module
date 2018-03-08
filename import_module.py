@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+__all__ = ["GitError", "ModuleNotFound", "DownloadFailed", "ImportModule"]
+
 import os
 import re
 import sys
@@ -14,7 +16,19 @@ _MODULES_PATH = os.path.abspath("__importmodule__")
 _ERROR_INVALID_NAME = 123
 
 
-class Function:
+class GitError(ImportError):
+    pass
+
+
+class ModuleNotFound(ImportError):
+    pass
+
+
+class DownloadFailed(ImportError):
+    pass
+
+
+class _Function:
     """
     Helper class to save the result of a call
     """
@@ -35,18 +49,6 @@ class Function:
         self.__result = None
 
 
-class GitError(Exception):
-    pass
-
-
-class ModuleNotFound(Exception):
-    pass
-
-
-class DownloadFailed(Exception):
-    pass
-
-
 def _get_tar_sub_folder(tar):
     prefix = tar.members[0].name + "/"
     prefix_size = len(prefix)
@@ -56,22 +58,46 @@ def _get_tar_sub_folder(tar):
             yield member
 
 
-class ImportModule(object):
-    def __init__(self, module, path=None, reload_module=False):
-        if not isinstance(module, (str, tuple, list)):
-            raise AttributeError("module must be either str or tuple/list")
-        if isinstance(module, (tuple, list)):
-            for value in module:
-                if not isinstance(value, str):
-                    raise AttributeError("url must be composed of str values")
-        if not (path is None or isinstance(path, str)):
-            raise AttributeError("path must be either None or str")
-        if not isinstance(reload_module, bool):
-            raise AttributeError("reload must be True or False")
+class _ModuleInfo:
+    def __init__(self, module, path=None):
+        module = module.replace("\\", "/")
+        while "//" in module:
+            module = module.replace("//", "")
+
+        match = _Function(re.match)
+        if match(r"^(github.com/|bitbucket.org/|git.launchpad.net/)", module):
+            _type = "git"
+            _path = module
+
+        elif match(r"^pypi.python.org/pypi/([-\w.]+)/([\w.]+)/?$", module):
+            _type = "pypi"
+            _path = module
+
+        elif match(r"^pypi.python.org/pypi/([-\w.]+)/?$", module):
+            _type = "pypi"
+            _path = "pypi.python.org/pypi/{}/latest/".format(
+                match.result.group(1))
+
+        else:
+            raise NotImplementedError("Type of module not supported")
+
+        if path is not None:
+            _path = path
+
+        if not self._is_pathname_valid(_path):
+            _path = self._get_valid_path(_path)
 
         self.module = module
-        self.reload = reload_module
-        self.path = path
+        self.path = os.path.join(_MODULES_PATH, _path)
+        self.type = _type
+
+    @property
+    def is_type_git(self):
+        return self.type == "git"
+
+    @property
+    def is_type_pypi(self):
+        return self.type == "pypi"
 
     @staticmethod
     def _is_pathname_valid(pathname):
@@ -109,6 +135,24 @@ class ImportModule(object):
     def _get_valid_path(path):
         return re.sub(r"(?u)[^-\w. ()+]", "", path)
 
+
+class ImportModule(object):
+    def __init__(self, module, path=None, reload_module=False):
+        if not isinstance(module, (str, tuple, list)):
+            raise AttributeError("module must be either str or tuple/list")
+        if isinstance(module, (tuple, list)):
+            for value in module:
+                if not isinstance(value, str):
+                    raise AttributeError("url must be composed of str values")
+        if not (path is None or isinstance(path, str)):
+            raise AttributeError("path must be either None or str")
+        if not isinstance(reload_module, bool):
+            raise AttributeError("reload must be True or False")
+
+        self.module = module
+        self.reload = reload_module
+        self.path = path
+
     @staticmethod
     def _chmod(path, mode):
         for root, dirs, files in os.walk(path):
@@ -125,77 +169,80 @@ class ImportModule(object):
             for d in dirs:
                 os.rmdir(os.path.join(root, d))
 
-    def _has_module(self, path):
-        if self.reload and os.path.exists(path):
-            self._remove_tree(path)
-        if os.path.exists(path) and os.listdir(path):
-            return True
-        return False
+    @staticmethod
+    def _make_dirs(path):
+        if not os.path.exists(path):
+            os.makedirs(path)
 
-    def _load_module(self, module):
-        _path = module if self.path is None else self.path
-
-        if not self._is_pathname_valid(_path):
-            _path = self._get_valid_path(_path)
-
-        module_path = os.path.join(_MODULES_PATH, _path)
-        if self._has_module(module_path):
-            return
-
-        match = Function(re.match)
-        if match(r"^(github.com/|bitbucket.org/|git.launchpad.net/)", module):
+    def _get_module(self, module_info):
+        if module_info.is_type_git:
             try:
-                git.Repo.clone_from("https://{}".format(module), module_path)
+                git.Repo.clone_from("https://{}".format(module_info.module),
+                                    module_info.path)
             except Exception as e:
                 raise GitError(e)
-            self._chmod(module_path, 0o755)
+            self._chmod(module_info.path, 0o755)
 
-        elif match(r"^pypi.python.org/pypi/([-\w]+)", module):
-            module_name = match.result.group(1)
-            json_url = "https://pypi.python.org/pypi/{}/json".format(
-                module_name)
-
-            r = requests.get(json_url)
+        elif module_info.is_type_pypi:
+            r = requests.get("https://{}/json".format(module_info.module))
             try:
-                module_info = r.json()
+                json_data = r.json()
             except Exception:
                 raise ModuleNotFound(
-                    "Unable to get module '{}' from pypi".format(module_name))
+                    "Unable to get module '{}' from pypi".format(
+                        module_info.module))
 
-            latest = module_info["urls"][1]
+            module = None
+            for url in json_data["urls"]:
+                if url["packagetype"] == "sdist":
+                    module = url
 
-            tar_path = os.path.join(module_path, latest["filename"])
+            if module is None:
+                raise ModuleNotFound(
+                    "Unable to get module '{}' from pypi".format(
+                        module_info.module))
+
+            tar_path = os.path.join(module_info.path, module["filename"])
             h = hashlib.md5()
-            with requests.get(latest["url"], stream=True) as stream:
-                if not os.path.exists(module_path):
-                    os.makedirs(module_path)
+            with requests.get(module["url"], stream=True) as stream:
+                self._make_dirs(module_info.path)
                 with open(tar_path, "wb") as f:
-                    for chunk in stream.iter_content(512):
+                    for chunk in stream.iter_content(1024):
                         f.write(chunk)
                         h.update(chunk)
 
-            if h.hexdigest() != latest["md5_digest"]:
+            if h.hexdigest() != module["md5_digest"]:
                 os.remove(tar_path)
                 raise DownloadFailed(
-                    "Failed to download '{}'".format(latest["url"]))
+                    "Failed to download '{}'".format(module["url"]))
 
             with tarfile.open(tar_path) as tar:
-                tar.extractall(module_path, _get_tar_sub_folder(tar))
+                tar.extractall(module_info.path, _get_tar_sub_folder(tar))
 
             os.remove(tar_path)
 
         else:
             raise NotImplementedError("Type of module not supported")
 
-        if module_path not in sys.path:
-            sys.path.insert(0, module_path)
+    def _load_module(self, module, path=None):
+        module_info = _ModuleInfo(module, path)
+
+        if self.reload and os.path.exists(module_info.path):
+            self._remove_tree(module_info.path)
+
+        if (not os.path.exists(module_info.path) or
+                not os.listdir(module_info.path)):
+            self._get_module(module_info)
+
+        if module_info.path not in sys.path:
+            sys.path.insert(0, module_info.path)
 
     def __enter__(self):
         if isinstance(self.module, str):
-            self._load_module(self.module)
+            self._load_module(self.module, self.path)
         else:
             for module in self.module:
-                self._load_module(module)
+                self._load_module(module, self.path)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
