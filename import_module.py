@@ -15,6 +15,9 @@ import requests
 _MODULES_PATH = os.path.abspath("__importmodule__")
 _ERROR_INVALID_NAME = 123
 
+_TYPE_GIT = 0
+_TYPE_PYPI = 1
+
 
 class GitError(ImportError):
     pass
@@ -63,20 +66,20 @@ class _ModuleInfo:
         module = module.replace("\\", "/")
         while "//" in module:
             module = module.replace("//", "")
+        if module.endswith("/"):
+            module = module[:-1]
 
-        match = _Function(re.match)
-        if match(r"^(github.com/|bitbucket.org/|git.launchpad.net/)", module):
-            _type = "git"
+        if re.match("^(github.com|bitbucket.org|git.launchpad.net)/", module):
+            _type = _TYPE_GIT
+            _path = re.sub(r"(?<=[^/]).git$", "", module)
+
+        elif re.match(r"^pypi.python.org/pypi/[-\w.]+/[\w.]+$", module):
+            _type = _TYPE_PYPI
             _path = module
 
-        elif match(r"^pypi.python.org/pypi/([-\w.]+)/([\w.]+)/?$", module):
-            _type = "pypi"
-            _path = module
-
-        elif match(r"^pypi.python.org/pypi/([-\w.]+)/?$", module):
-            _type = "pypi"
-            _path = "pypi.python.org/pypi/{}/latest/".format(
-                match.result.group(1))
+        elif re.match(r"^pypi.python.org/pypi/[-\w.]+$", module):
+            _type = _TYPE_PYPI
+            _path = "{}/latest".format(module)
 
         else:
             raise NotImplementedError("Type of module not supported")
@@ -90,14 +93,6 @@ class _ModuleInfo:
         self.module = module
         self.path = os.path.join(_MODULES_PATH, _path)
         self.type = _type
-
-    @property
-    def is_type_git(self):
-        return self.type == "git"
-
-    @property
-    def is_type_pypi(self):
-        return self.type == "pypi"
 
     @staticmethod
     def _is_pathname_valid(pathname):
@@ -175,7 +170,7 @@ class ImportModule(object):
             os.makedirs(path)
 
     def _get_module(self, module_info):
-        if module_info.is_type_git:
+        if module_info.type == _TYPE_GIT:
             try:
                 git.Repo.clone_from("https://{}".format(module_info.module),
                                     module_info.path)
@@ -183,7 +178,7 @@ class ImportModule(object):
                 raise GitError(e)
             self._chmod(module_info.path, 0o755)
 
-        elif module_info.is_type_pypi:
+        elif module_info.type == _TYPE_PYPI:
             r = requests.get("https://{}/json".format(module_info.module))
             try:
                 json_data = r.json()
