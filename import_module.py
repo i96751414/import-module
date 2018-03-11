@@ -130,6 +130,15 @@ class _ModuleInfo:
 
 class ImportModule(object):
     def __init__(self, module, path=None, reload_module=False):
+        """
+        Import the specified module. If the module already exists and
+        `reload_module` is True, then re-import the module. If `path` is
+        given, the module will be imported to the given path.
+
+        :param module: module to import.
+        :param path: path where to import the module.
+        :param reload_module: reload module if already it exists.
+        """
         if not isinstance(module, (str, tuple, list)):
             raise AttributeError("module must be either str or tuple/list")
         if isinstance(module, (tuple, list)):
