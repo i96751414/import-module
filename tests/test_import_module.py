@@ -43,6 +43,12 @@ def clear_modules_path():
         os.rmdir(_MODULES_PATH)
 
 
+def import_module(module, package=None):
+    if module in sys.modules:
+        del sys.modules[module]
+    return importlib.import_module(module, package)
+
+
 def check_import_module(module, module_name, checker_handler):
     """
     Set of checks for testing if a module is being imported
@@ -58,7 +64,7 @@ def check_import_module(module, module_name, checker_handler):
     # Since it is the first time importing, the repo should be cloned
     timer.start()
     with ImportModule(module):
-        m1 = importlib.import_module(module_name)
+        m1 = import_module(module_name)
     t1 = timer.stop()
 
     # Check behavior of imported module
@@ -68,7 +74,7 @@ def check_import_module(module, module_name, checker_handler):
     # the repo should NOT be cloned
     timer.start()
     with ImportModule(module, reload_module=False):
-        m2 = importlib.import_module(module_name)
+        m2 = import_module(module_name)
     t2 = timer.stop()
 
     # Check behavior of imported module
@@ -78,7 +84,7 @@ def check_import_module(module, module_name, checker_handler):
     # the repo should be cloned
     timer.start()
     with ImportModule(module, reload_module=True):
-        m3 = importlib.import_module(module_name)
+        m3 = import_module(module_name)
     t3 = timer.stop()
 
     # Check behavior of imported module
@@ -87,7 +93,7 @@ def check_import_module(module, module_name, checker_handler):
     # Import the module using a different path - the repo should be cloned
     timer.start()
     with ImportModule(module, path="different_path"):
-        m4 = importlib.import_module(module_name)
+        m4 = import_module(module_name)
     t4 = timer.stop()
 
     # Check behavior of imported module
@@ -100,14 +106,14 @@ def check_import_module(module, module_name, checker_handler):
 
     # Test ImportModule with array
     with ImportModule([module, module]):
-        m4 = importlib.import_module(module_name)
+        m4 = import_module(module_name)
 
     # Check behavior of imported module
     checker_handler(m4)
 
     # Test ImportModule with tuple
     with ImportModule((module, module)):
-        m5 = importlib.import_module(module_name)
+        m5 = import_module(module_name)
 
     # Check behavior of imported module
     checker_handler(m5)
@@ -125,6 +131,20 @@ def test_import_github():
 
     check_import_module(
         "github.com/i96751414/py-dummy", "dummy", check_dummy_module)
+
+
+def test_import_pypi():
+    def check_six_1_0_0(module):
+        assert module.__version__ == "1.0.0"
+
+    check_import_module(
+        "pypi.python.org/pypi/six/1.0.0", "six", check_six_1_0_0)
+
+    def check_six_latest(module):
+        assert module.__version__ > "1.0.0"
+
+    check_import_module(
+        "pypi.python.org/pypi/six", "six", check_six_latest)
 
 
 if __name__ == "__main__":
