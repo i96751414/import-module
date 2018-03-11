@@ -118,6 +118,9 @@ def check_import_module(module, module_name, checker_handler):
     # Check behavior of imported module
     checker_handler(m5)
 
+    # Clear everything
+    clear_modules_path()
+
 
 def test_import_github():
     def check_dummy_module(module):
