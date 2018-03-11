@@ -63,11 +63,8 @@ def _get_tar_sub_folder(tar):
 
 class _ModuleInfo:
     def __init__(self, module, path=None):
-        module = module.replace("\\", "/")
-        while "//" in module:
-            module = module.replace("//", "")
-        if module.endswith("/"):
-            module = module[:-1]
+        module = re.sub(r"[\\/]+", "/", module)
+        module = re.sub("/$", "", module)
 
         if re.match("^(github.com|bitbucket.org|git.launchpad.net)/", module):
             _type = _TYPE_GIT
