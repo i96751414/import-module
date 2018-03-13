@@ -9,6 +9,7 @@ python:
 # Install dependencies
 install:
   - pip install -r requirements.txt
+  - pip install --upgrade setuptools
   - pip install flake8 pytest
 
 # Run tests
