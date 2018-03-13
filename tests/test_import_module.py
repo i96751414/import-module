@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
 import sys
 import time
 # noinspection PyPackageRequirements
@@ -49,6 +50,12 @@ def import_module(module, package=None):
     return importlib.import_module(module, package)
 
 
+def check_module_path(path):
+    path = re.sub(r"[\\/]+", "/", path)
+    modules_path = re.sub(r"[\\/]+", "/", _MODULES_PATH)
+    assert path.startswith(modules_path)
+
+
 def check_import_module(module, module_name, checker_handler):
     """
     Set of checks for testing if a module is being imported
@@ -69,6 +76,7 @@ def check_import_module(module, module_name, checker_handler):
 
     # Check behavior of imported module
     checker_handler(m1)
+    check_module_path(m1.__file__)
 
     # Since it is the second time importing and reload=False
     # the repo should NOT be cloned
@@ -79,6 +87,7 @@ def check_import_module(module, module_name, checker_handler):
 
     # Check behavior of imported module
     checker_handler(m2)
+    check_module_path(m2.__file__)
 
     # Although it is the third time importing, reload is True so
     # the repo should be cloned
@@ -89,6 +98,7 @@ def check_import_module(module, module_name, checker_handler):
 
     # Check behavior of imported module
     checker_handler(m3)
+    check_module_path(m3.__file__)
 
     # Import the module using a different path - the repo should be cloned
     timer.start()
@@ -98,6 +108,7 @@ def check_import_module(module, module_name, checker_handler):
 
     # Check behavior of imported module
     checker_handler(m4)
+    check_module_path(m4.__file__)
 
     # Check if times match: when reload=False, the time should be minimal
     assert t2 < t1
@@ -106,17 +117,19 @@ def check_import_module(module, module_name, checker_handler):
 
     # Test ImportModule with array
     with ImportModule([module, module]):
-        m4 = import_module(module_name)
-
-    # Check behavior of imported module
-    checker_handler(m4)
-
-    # Test ImportModule with tuple
-    with ImportModule((module, module)):
         m5 = import_module(module_name)
 
     # Check behavior of imported module
     checker_handler(m5)
+    check_module_path(m5.__file__)
+
+    # Test ImportModule with tuple
+    with ImportModule((module, module)):
+        m6 = import_module(module_name)
+
+    # Check behavior of imported module
+    checker_handler(m6)
+    check_module_path(m6.__file__)
 
     # Clear everything
     clear_modules_path()
