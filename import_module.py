@@ -57,7 +57,7 @@ class _Function:
 
 
 class _ModuleInfo:
-    def __init__(self, module, path=None, force_pip=False):
+    def __init__(self, module, path=None, use_pip=False):
         module = re.sub(r"[\\/]+", "/", module)
         module = re.sub("/$", "", module)
 
@@ -65,7 +65,7 @@ class _ModuleInfo:
         if match(r"^(github\.com|bitbucket\.org|git\.launchpad\.net)/", module):
             _path = re.sub(r"(?<=[^/])\.git$", "", module)
             _module_name = _path.split("/")[-1]
-            if force_pip:
+            if use_pip:
                 _type = _TYPE_GIT_PIP
                 module = "git+https://{}".format(module)
             else:
@@ -147,19 +147,18 @@ class _ModuleInfo:
 
 
 class ImportModule(object):
-    def __init__(self, module, path=None, reload_module=False,
-                 force_pip=False):
+    def __init__(self, module, path=None, reload_module=False, use_pip=False):
         """
         Import the specified module. If the module already exists and
         `reload_module` is True, then re-import the module. If `path` is
-        given, the module will be imported to the given path. If `force_pip`
+        given, the module will be imported to the given path. If `use_pip`
         is True, the module will be imported with pip, even if it is a git
         repository.
 
         :param module: module to import.
         :param path: path where to import the module.
         :param reload_module: reload module if already it exists.
-        :param force_pip: always use pip to get modules.
+        :param use_pip: always use pip to get modules.
         """
         if not isinstance(module, (str, tuple, list)):
             raise AttributeError("module must be either str or tuple/list")
@@ -171,13 +170,13 @@ class ImportModule(object):
             raise AttributeError("path must be either None or str")
         if not isinstance(reload_module, bool):
             raise AttributeError("reload_module must be either True or False")
-        if not isinstance(force_pip, bool):
+        if not isinstance(use_pip, bool):
             raise AttributeError("force_pip must be either True or False")
 
         self.module = module
         self.path = path
         self.reload = reload_module
-        self.force_pip = force_pip
+        self.use_pip = use_pip
 
     @staticmethod
     def _chmod(path, mode):
@@ -232,7 +231,7 @@ class ImportModule(object):
             raise NotImplementedError("Type of module not supported")
 
     def _load_module(self, module):
-        module_info = _ModuleInfo(module, self.path, self.force_pip)
+        module_info = _ModuleInfo(module, self.path, self.use_pip)
 
         if self.reload or not module_info.is_installed:
             self._get_module(module_info)

@@ -34,6 +34,6 @@ The output of dummy.call is 'call'
 
 #### API
 
-- **ImportModule**(module, path=None, reload_module=False, force_pip=False)
+- **ImportModule**(module, path=None, reload_module=False, use_pip=False)
 
-    Import the specified module. If the module already exists and `reload_module` is True, then re-import the module. If `path` is given, the module will be imported to the given path. If `force_pip` is True, the module will be imported with pip, even if it is a git repository.
+    Import the specified module. If the module already exists and `reload_module` is True, then re-import the module. If `path` is given, the module will be imported to the given path. If `use_pip` is True, the module will be imported with pip, even if it is a git repository.
