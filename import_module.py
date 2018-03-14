@@ -16,6 +16,7 @@ _ERROR_INVALID_NAME = 123
 
 _TYPE_GIT = 0
 _TYPE_PIP = 1
+_TYPE_GIT_PIP = 2
 
 
 class GitError(ImportError):
@@ -55,39 +56,29 @@ class _Function:
         self.__result = None
 
 
-def _get_tar_sub_folder(tar):
-    prefix = tar.members[0].name + "/"
-    prefix_size = len(prefix)
-    for member in tar.getmembers():
-        if member.name.startswith(prefix):
-            member.path = member.path[prefix_size:]
-            yield member
-
-
 class _ModuleInfo:
     def __init__(self, module, path=None, force_pip=False):
         module = re.sub(r"[\\/]+", "/", module)
         module = re.sub("/$", "", module)
 
         match = _Function(re.match)
-        if match(r"^(github.com|bitbucket.org|git.launchpad.net)/", module):
-            _module_name = re.sub(r"(?<=.).git$", "", module.split("/")[-1])
+        if match(r"^(github\.com|bitbucket\.org|git\.launchpad\.net)/", module):
+            _path = re.sub(r"(?<=[^/])\.git$", "", module)
+            _module_name = _path.split("/")[-1]
             if force_pip:
-                _type = _TYPE_PIP
-                _path = "pypi.python.org/pypi"
+                _type = _TYPE_GIT_PIP
                 module = "git+https://{}".format(module)
             else:
                 _type = _TYPE_GIT
-                _path = re.sub(r"(?<=[^/]).git$", "", module)
                 module = "https://{}".format(module)
 
-        elif match(r"^(pypi.python.org/pypi)/([-\w.]+)/([\w.]+)$", module):
+        elif match(r"^(pypi\.python\.org/pypi)/([-\w.]+)/([\w.]+)$", module):
             _type = _TYPE_PIP
             _path = match.result.group(1)
             _module_name = match.result.group(2)
             module = "{}=={}".format(_module_name, match.result.group(3))
 
-        elif match(r"^(pypi.python.org/pypi)/([-\w.]+)$", module):
+        elif match(r"^(pypi\.python\.org/pypi)/([-\w.]+)$", module):
             _type = _TYPE_PIP
             _path = match.result.group(1)
             _module_name = match.result.group(2)
@@ -106,19 +97,17 @@ class _ModuleInfo:
         self.module_name = _module_name
         self.path = os.path.join(_MODULES_PATH, _path)
         self.type = _type
-        self.is_installed = self._is_installed(
-            self.module_name, self.type, self.path)
 
-    @staticmethod
-    def _is_installed(module_name, module_type, module_path):
-        if module_type == _TYPE_PIP:
-            env = pkg_resources.Environment([module_path])
+    @property
+    def is_installed(self):
+        if self.type == _TYPE_PIP:
+            env = pkg_resources.Environment([self.path])
             for project in env:
-                if project == module_name:
+                if project == self.module_name:
                     return True
             return False
         else:
-            return os.path.exists(module_path) and os.listdir(module_path)
+            return os.path.exists(self.path) and os.listdir(self.path)
 
     @staticmethod
     def _is_pathname_valid(pathname):
@@ -216,14 +205,17 @@ class ImportModule(object):
             if os.path.exists(module_info.path):
                 self._remove_tree(module_info.path)
             try:
-                git.Repo.clone_from(module_info.module, module_info.path)
+                git.Repo.clone_from(
+                    module_info.module, module_info.path, depth=1)
             except Exception as e:
                 raise GitError(e)
             self._chmod(module_info.path, 0o755)
 
-        elif module_info.type == _TYPE_PIP:
+        elif module_info.type in {_TYPE_PIP, _TYPE_GIT_PIP}:
             args = ["install", module_info.module, "--isolated", "--target",
                     module_info.path, "--quiet"]
+            if module_info.type == _TYPE_GIT_PIP:
+                args.append("--no-dependencies")
             if self.reload:
                 args.append("--upgrade")
             try:
